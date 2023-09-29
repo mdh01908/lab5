@@ -85,12 +85,12 @@ median_wind_site <- dat[median(wind.sp, na.rm = TRUE)]
 
 wind_quantiles <- quantile(dat$wind.sp, na.rm = TRUE)
 median_wind <- median(dat$wind.sp, na.rm = TRUE)
-median_station_temp <- dat$USAFID[which.min(abs(dat$wind.sp - median_wind))]
+median_station_wind <- dat$USAFID[which.min(abs(dat$wind.sp - median_wind))]
 
 median_wind_site # 690150 
 wind_quantiles #  2.1
 median_wind #2.1
-median_station_temp #720113
+median_station_wind #720113
 
 #temp
 median_temp_site <- dat[median(temp, na.rm = TRUE)]
@@ -138,10 +138,8 @@ distances_by_state <- sapply(states, function(state) {
   CalculateEuclideanDistance(subset_dat$lon, subset_dat$lat)
 })
 
-for (i in 1:length(states)) {
-  cat("Euclidean distance for", states[i], "is:", distances_by_state[i], "\n")
-}
 
+distances_by_state
 
 ```
 
