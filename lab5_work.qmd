@@ -127,6 +127,24 @@ Just like the previous question, you are asked to identify what is the most repr
 
 Knit the doc and save it on GitHub.
 
+```{r}
+
+CalculateEuclideanDistance <- function(longitude, latitude) sqrt(sum((longitude - latitude)^2))
+  
+
+states <- unique(dat$STATE)
+distances_by_state <- sapply(states, function(state) {
+  subset_dat <- dat[dat$STATE == state, ]
+  CalculateEuclideanDistance(subset_dat$lon, subset_dat$lat)
+})
+
+for (i in 1:length(states)) {
+  cat("Euclidean distance for", states[i], "is:", distances_by_state[i], "\n")
+}
+
+
+```
+
 ## **Question 3: In the middle?**
 
 For each state, identify what is the station that is closest to the mid-point of the state. Combining these with the stations you identified in the previous question, use `leaflet()` to visualize all \~100 points in the same figure, applying different colors for those identified in this question.
