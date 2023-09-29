@@ -56,17 +56,13 @@ dat <- merge(
   # Data
   x     = met,      
   y     = stations, 
-  # List of variables to match
   by.x  = "USAFID",
   by.y  = "USAF", 
-  # Which obs to keep?
   all.x = TRUE,      
   all.y = FALSE
   )
 head(dat[, list(USAFID, WBAN, STATE)], n = 4)
 ```
-
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
 
 ## Q.1 **Representative station for the US**
 
@@ -155,89 +151,6 @@ station_distances
 
 ```
 
-```{r}
-#wrong but leave for now for others
-CalculateEuclideanDistance <- function(longitude, latitude) sqrt(sum((longitude - latitude)^2))
-  
-
-states <- unique(dat$STATE)
-distances_by_state <- sapply(states, function(state) {
-  subset_dat <- dat[dat$STATE == state, ]
-  CalculateEuclideanDistance(subset_dat$lon, subset_dat$lat)
-})
-
-
-distances_by_state
-
-```
-
-```{r}
-#class
-
-station.dist <- station
-station.dist$temp <- station.dist$temp - avg.temp
-
-station.dist$temp <- station.dist$temp^2
-
-sqr.dist  <- st
-library(magrittr)
-
-station <- met[, .(
-  lat = mean(lat,na )
-  lon = mean(lon,na )
-  elev = mean(let,na )
-), by =c("USAFID")]
-```
-
-```{r}
-# working
-
-med.temp <- median(dat$temp, na.rm = TRUE)
-med.wind.sp <- median(dat$wind.sp, na.rm = TRUE)
-med.atm.press <- median(dat$atm.press, na.rm = TRUE)
-
-#this is working
-distance_to_median <- function(temp, wind.sp, atm.press) {
-  temp_distance <- ifelse(is.na(temp), 0, abs(temp - med.temp))
-  wind_distance <- ifelse(is.na(wind.sp), 0, abs(wind.sp - med.wind.sp))
-  atm_distance <- ifelse(is.na(atm.press), 0, abs(atm.press - med.atm.press))
-  return(temp_distance + wind_distance + atm_distance)
-}
-
-station <- met[,distance_to_median(dat$temp, dat$wind.sp, dat$atm.press), by = 'STATE']
-
-
-### NOT WORKING
-# Calculate the distance for each row
-dat$distance_to_median <- with(dat, distance_to_median(temp, wind.sp, atm.press))
-
-# Find the row with the minimum distance for each state
-closest_stations <- dat[which.min(dat$distance_to_median), ]
-
-# Extract the USAFID, temp, wind speed, and atm pressure for each state
-result <- by(closest_stations, closest_stations$STATE, function(state_data) {
-  return(state_data[, c("USAFID", "temp", "wind.sp", "atm.press")])
-})
-
-# Convert the result to a list or data frame
-result <- closest_stations %>%
-  group_by(STATE) %>%
-  summarise(
-    USAFID = first(USAFID),
-    temp = first(temp),
-    wind.sp = first(wind.sp),
-    atm.press = first(atm.press)
-  ) %>%
-  ungroup()
-
-
-
-#no
-result <- as.data.frame(result)
-rownames(result) <- NULL
-
-```
-
 ## **Question 3: In the middle?**
 
 For each state, identify what is the station that is closest to the mid-point of the state. Combining these with the stations you identified in the previous question, use `leaflet()` to visualize all \~100 points in the same figure, applying different colors for those identified in this question.
@@ -245,30 +158,60 @@ For each state, identify what is the station that is closest to the mid-point of
 Knit the doc and save it on GitHub.
 
 ```{r}
+med.lon <- sapply(split(dat$lon, dat$STATE), median, na.rm = TRUE)
+med.lat <- sapply(split(dat$lat, dat$STATE), median, na.rm = TRUE)
 
-median of lon and latitude 
+median_pt <- data.table(
+  state = names(med.lon),
+  longitude = med.lon,
+  latitude = med.lat
+)
 
-station <- met[, .(
-  lat = mean(lat, na.rm=TRUE )
-  lon = mean(lon, na.rm=TRUE)
-  elev = mean(elev ,na.rm=TRUE )
-), by =c("USAFID")]
+station_center <- dat %>%
+  mutate(
+    lon_distance = ifelse(is.na(lon), NA, abs(lon - med.lon)),
+    lat_distance = ifelse(is.na(lat), NA, abs(lat - med.lat))) %>%
+  group_by(STATE) %>%
+  summarise(
+    USAFID = USAFID[which.min(lon_distance + lat_distance)],
+    lon = lon[which.min(lon_distance + lat_distance)],
+    lat = lat[which.min(lon_distance + lat_distance)],
+  ) %>%
+  ungroup()
 
-station.dist <- station
-station.lon <- dat$lon - avg.lot
-station.lat <- dat$lat - avg.lat
+station_center
+```
 
-station.lon2 <- station.lon2^2
-station.lat2 <- station.lat2^2
+```{r}
+library(leaflet)
+library(dplyr)
 
-sqr.dist  <- st
-library(magrittr)
+euc_map <- leaflet() %>%
+  addProviderTiles('CartoDB.Positron') 
 
-station <- met[, .(
-  lat = mean(lat,na )
-  lon = mean(lon,na )
-  elev = mean(let,na )
-), by =c("USAFID")]
+euc_map <- euc_map %>%
+  addCircleMarkers(
+    data = median_pt,
+    lng = ~longitude,
+    lat = ~latitude,
+    color = "blue",
+    radius = 6,
+    popup = ~state
+  )
+
+euc_map <- euc_map %>%
+  addCircleMarkers(
+    data = station_center,
+    lng = ~lon,
+    lat = ~lat,
+    color = "red",
+    radius = 6,
+    popup = ~STATE
+  )
+
+
+euc_map
+
 ```
 
 ## Q.4 **Means of means**
@@ -295,19 +238,112 @@ Once you are done with that, you can compute the following:
 
 -   Mean temperature, wind-speed, and atmospheric pressure.
 
-All by the levels described before.
-
-Knit the document, commit your changes, and push them to GitHub. If you'd like, you can take this time to include the link of [the issue of the week](https://github.com/USCbiostats/PM566/issues/42) so that you let us know when you are done, e.g.,
+```{r}
+test_temp <- sapply(split(dat$temp, dat$STATE), quantile, na.rm = TRUE)
+quantiles_50 <- test_temp["50%",]
+quantiles_50
+```
 
 ```{r}
+dat2 <- dat %>%
+  group_by(STATE) %>%
+  mutate(Median_Temperature = median(temp, na.rm = TRUE)) %>%
+  ungroup()
+dat2
+
+
+dat3 <- dat2 %>%
+  group_by(STATE) %>%
+  mutate(Median_Temperature = median(temp, na.rm = TRUE),
+         temp_cat = case_when(
+           Median_Temperature < 20 ~ 'Low temp',
+           Median_Temperature >= 20 & Median_Temperature < 25 ~ 'Mid temp',
+           Median_Temperature >= 25 ~ 'High temp',
+           TRUE ~ 'NA'
+         )) %>%
+  ungroup()
+dat3
+
+sum(dat3$temp_cat=='Low temp')
+sum(dat3$temp_cat=='Mid temp')
+sum(dat3$temp_cat=='High temp')
+sum(430794,1135423,811126 )
+```
+
+### Low Temp
+
+```{r}
+#Number of entries (records),
+sum(dat3$temp_cat=='Low temp')
+
+#Number of NA entries,
+sum(dat3$temp_cat=='NA')
+length(is.na(dat3$temp_cat=='Low temp'))
+
+#Number of stations,
+unique(dat3$USAFID[dat3$temp_cat == 'Low temp'])
+
+sum(unique(dat3$USAFID[dat3$temp_cat == 'Low temp']))
+
+
+#Number of states included, and
+unique(dat3$STATE[dat3$temp_cat == 'Low temp'])
+length(unique(dat3$STATE[dat3$temp_cat == 'Low temp']))
+#11
+
+#Mean temperature, wind-speed, and atmospheric pressure.
+mean(dat3$temp[dat3$temp_cat == 'Low temp'], na.rm = TRUE)
+#18.96446
 
 ```
 
-# extra
+### Mid Temp
 
 ```{r}
-#| echo: false
-2 * 2
+#Number of entries (records),
+sum(dat3$temp_cat=='Mid temp')
+
+#Number of NA entries,
+sum(dat3$temp_cat=='NA')
+
+#Number of stations,
+unique(dat3$USAFID[dat3$temp_cat == 'Mid temp'])
+
+sum(unique(dat3$USAFID[dat3$temp_cat == 'Mid temp']))
+#565356157
+
+#Number of states included, and
+unique(dat3$STATE[dat3$temp_cat == 'Mid temp'])
+length(unique(dat3$STATE[dat3$temp_cat == 'Mid temp']))
+#25
+
+#Mean temperature, wind-speed, and atmospheric pressure.
+mean(dat3$temp[dat3$temp_cat == 'Mid temp'], na.rm = TRUE)
+#22.39909
+
 ```
 
-The `echo: false` option disables the printing of code (only output is displayed).
+### High Temp
+
+```{r}
+#Number of entries (records),
+sum(dat3$temp_cat=='High temp')
+
+#Number of NA entries,
+sum(dat3$temp_cat=='NA')
+
+#Number of stations,
+unique(dat3$USAFID[dat3$temp_cat == 'High temp'])
+
+sum(unique(dat3$USAFID[dat3$temp_cat == 'High temp']))
+#400804953
+
+#Number of states included, and
+unique(dat3$STATE[dat3$temp_cat == 'High temp'])
+length(unique(dat3$STATE[dat3$temp_cat == 'High temp']))
+#12
+
+#Mean temperature, wind-speed, and atmospheric pressure.
+mean(dat3$temp[dat3$temp_cat == 'High temp'], na.rm = TRUE)
+#27.75066
+```
