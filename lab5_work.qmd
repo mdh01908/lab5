@@ -129,6 +129,34 @@ Knit the doc and save it on GitHub.
 
 ```{r}
 
+#  ## WORKING
+library(dplyr)
+
+med.temp <- median(dat$temp, na.rm = TRUE)
+med.wind.sp <- median(dat$wind.sp, na.rm = TRUE)
+med.atm.press <- median(dat$atm.press, na.rm = TRUE)
+
+station_distances <- dat %>%
+  mutate(
+    temp_distance = ifelse(is.na(temp), NA, abs(temp - med.temp)),
+    wind_distance = ifelse(is.na(wind.sp), NA, abs(wind.sp - med.wind.sp)),
+    atm_distance = ifelse(is.na(atm.press), NA, abs(atm.press - med.atm.press))
+  ) %>%
+  group_by(STATE) %>%
+  summarise(
+    USAFID = USAFID[which.min(temp_distance + wind_distance + atm_distance)],
+    temp = temp[which.min(temp_distance + wind_distance + atm_distance)],
+    wind.sp = wind.sp[which.min(temp_distance + wind_distance + atm_distance)],
+    atm.press = atm.press[which.min(temp_distance + wind_distance + atm_distance)]
+  ) %>%
+  ungroup()
+
+station_distances
+
+```
+
+```{r}
+#wrong but leave for now for others
 CalculateEuclideanDistance <- function(longitude, latitude) sqrt(sum((longitude - latitude)^2))
   
 
@@ -143,6 +171,73 @@ distances_by_state
 
 ```
 
+```{r}
+#class
+
+station.dist <- station
+station.dist$temp <- station.dist$temp - avg.temp
+
+station.dist$temp <- station.dist$temp^2
+
+sqr.dist  <- st
+library(magrittr)
+
+station <- met[, .(
+  lat = mean(lat,na )
+  lon = mean(lon,na )
+  elev = mean(let,na )
+), by =c("USAFID")]
+```
+
+```{r}
+# working
+
+med.temp <- median(dat$temp, na.rm = TRUE)
+med.wind.sp <- median(dat$wind.sp, na.rm = TRUE)
+med.atm.press <- median(dat$atm.press, na.rm = TRUE)
+
+#this is working
+distance_to_median <- function(temp, wind.sp, atm.press) {
+  temp_distance <- ifelse(is.na(temp), 0, abs(temp - med.temp))
+  wind_distance <- ifelse(is.na(wind.sp), 0, abs(wind.sp - med.wind.sp))
+  atm_distance <- ifelse(is.na(atm.press), 0, abs(atm.press - med.atm.press))
+  return(temp_distance + wind_distance + atm_distance)
+}
+
+station <- met[,distance_to_median(dat$temp, dat$wind.sp, dat$atm.press), by = 'STATE']
+
+
+### NOT WORKING
+# Calculate the distance for each row
+dat$distance_to_median <- with(dat, distance_to_median(temp, wind.sp, atm.press))
+
+# Find the row with the minimum distance for each state
+closest_stations <- dat[which.min(dat$distance_to_median), ]
+
+# Extract the USAFID, temp, wind speed, and atm pressure for each state
+result <- by(closest_stations, closest_stations$STATE, function(state_data) {
+  return(state_data[, c("USAFID", "temp", "wind.sp", "atm.press")])
+})
+
+# Convert the result to a list or data frame
+result <- closest_stations %>%
+  group_by(STATE) %>%
+  summarise(
+    USAFID = first(USAFID),
+    temp = first(temp),
+    wind.sp = first(wind.sp),
+    atm.press = first(atm.press)
+  ) %>%
+  ungroup()
+
+
+
+#no
+result <- as.data.frame(result)
+rownames(result) <- NULL
+
+```
+
 ## **Question 3: In the middle?**
 
 For each state, identify what is the station that is closest to the mid-point of the state. Combining these with the stations you identified in the previous question, use `leaflet()` to visualize all \~100 points in the same figure, applying different colors for those identified in this question.
@@ -151,6 +246,29 @@ Knit the doc and save it on GitHub.
 
 ```{r}
 
+median of lon and latitude 
+
+station <- met[, .(
+  lat = mean(lat, na.rm=TRUE )
+  lon = mean(lon, na.rm=TRUE)
+  elev = mean(elev ,na.rm=TRUE )
+), by =c("USAFID")]
+
+station.dist <- station
+station.lon <- dat$lon - avg.lot
+station.lat <- dat$lat - avg.lat
+
+station.lon2 <- station.lon2^2
+station.lat2 <- station.lat2^2
+
+sqr.dist  <- st
+library(magrittr)
+
+station <- met[, .(
+  lat = mean(lat,na )
+  lon = mean(lon,na )
+  elev = mean(let,na )
+), by =c("USAFID")]
 ```
 
 ## Q.4 **Means of means**
